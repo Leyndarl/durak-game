@@ -3,120 +3,222 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎴 Дурак - Онлайн игра</title>
+    <title>🎴 Дурак - Онлайн игра P2P</title>
+    <!-- Подключаем PeerJS -->
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
-        body { background: #2c3e50; color: white; padding: 20px; }
-        .container { max-width: 1000px; margin: 0 auto; }
-
-        .login-screen, .game-screen { background: rgba(0,0,0,0.7); padding: 30px; border-radius: 10px; margin-bottom: 20px; }
-        .login-screen { text-align: center; }
-        input, button { padding: 10px; margin: 10px; border-radius: 5px; border: none; }
-        button { background: #3498db; color: white; cursor: pointer; }
-        button:hover { background: #2980b9; }
-
-        .players { display: flex; justify-content: space-between; margin: 20px 0; }
-        .player { background: #34495e; padding: 15px; border-radius: 10px; flex: 1; margin: 0 10px; text-align: center; }
-        .player.active { border: 3px solid #2ecc71; }
-
-        .game-area { background: #27ae60; padding: 20px; border-radius: 10px; min-height: 200px; margin: 20px 0; position: relative; }
-        .trump { position: absolute; top: 10px; right: 10px; background: white; color: black; padding: 10px; border-radius: 5px; }
-        .deck { position: absolute; top: 10px; left: 10px; background: white; color: black; padding: 10px; border-radius: 5px; }
-
-        .table { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 40px; }
-        .card { width: 60px; height: 90px; background: white; border-radius: 5px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: bold; color: black; }
-        .card.red { color: red; }
-
-        .hand { display: flex; flex-wrap: wrap; gap: 10px; padding: 20px; background: #34495e; border-radius: 10px; margin: 20px 0; min-height: 120px; }
-        .hand .card { cursor: pointer; }
-        .hand .card:hover { transform: translateY(-10px); }
-        .hand .card.selected { border: 3px solid #f1c40f; }
-
-        .controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-        .message { text-align: center; padding: 15px; background: rgba(0,0,0,0.5); border-radius: 10px; margin: 20px 0; }
-
-        .hidden { display: none; }
+        /* ... ваш существующий CSS ... */
+        
+        /* Добавьте эти стили */
+        .connection-status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .connected { background: #27ae60; }
+        .disconnected { background: #e74c3c; }
+        .connecting { background: #f39c12; }
+        
+        .code-input { 
+            display: flex; 
+            gap: 10px; 
+            justify-content: center; 
+            margin: 15px 0; 
+        }
+        .code-input input { 
+            width: 200px; 
+            text-align: center;
+            letter-spacing: 3px;
+            font-size: 18px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 style="text-align:center; color:#f1c40f; margin-bottom:20px;">🎴 Дурак - Онлайн игра</h1>
+        <h1 style="text-align:center; color:#f1c40f; margin-bottom:20px;">🎴 Дурак - P2P Онлайн</h1>
 
-        <div id="loginScreen" class="login-screen">
-            <h2>Создайте или присоединитесь к игре</h2>
+        <!-- Экран подключения -->
+        <div id="connectionScreen" class="login-screen">
+            <h2>Подключение к игре</h2>
             <input type="text" id="playerName" placeholder="Ваше имя" value="Игрок">
-            <button onclick="createGame()">Создать игру</button>
-            <button onclick="joinGame()">Присоединиться</button>
-            <div id="gameCodeDisplay" class="hidden">
-                <p>Код игры: <span id="gameCode"></span></p>
-                <p>Дайтe этот код другому игроку</p>
+            
+            <div class="code-input">
+                <input type="text" id="gameCodeInput" placeholder="Код игры (если есть)" maxlength="6">
             </div>
-            <input type="text" id="joinCode" placeholder="Код игры" class="hidden">
-            <div id="loginMessage"></div>
+            
+            <button onclick="createP2PGame()">Создать новую игру</button>
+            <button onclick="joinP2PGame()" id="joinBtn">Присоединиться</button>
+            
+            <div id="connectionStatus" class="connection-status disconnected">
+                Не подключено
+            </div>
+            
+            <div id="yourCode" style="display:none; margin-top:20px;">
+                <h3>Ваш код игры:</h3>
+                <div style="font-size: 24px; font-weight: bold; color: #2ecc71;" id="myPeerId"></div>
+                <p>Дайте этот код другому игроку</p>
+            </div>
+            
+            <div id="waitingMsg" style="display:none;">
+                <p>Ожидаем подключения второго игрока...</p>
+            </div>
         </div>
 
+        <!-- Остальная часть вашего HTML без изменений -->
         <div id="gameScreen" class="game-screen hidden">
-            <div class="players">
-                <div class="player" id="player1">
-                    <h3>Игрок 1</h3>
-                    <p>Карт: <span id="p1Cards">0</span></p>
-                </div>
-                <div class="player" id="player2">
-                    <h3>Игрок 2</h3>
-                    <p>Карт: <span id="p2Cards">0</span></p>
-                </div>
-            </div>
-
-            <div class="game-area">
-                <div class="deck" id="deckCount">36</div>
-                <div class="trump" id="trumpCard">Козырь: ?</div>
-                <div class="table" id="table">
-                    <!-- Карты на столе -->
-                </div>
-            </div>
-
-            <div class="message" id="gameMessage">
-                Ожидание второго игрока...
-            </div>
-
-            <div class="controls">
-                <button id="attackBtn" onclick="attack()" disabled>Атаковать</button>
-                <button id="defendBtn" onclick="defend()" disabled>Защититься</button>
-                <button id="addBtn" onclick="addCard()" disabled>Подкинуть</button>
-                <button id="takeBtn" onclick="takeCards()" disabled>Взять</button>
-                <button id="passBtn" onclick="passTurn()" disabled>Бито</button>
-            </div>
-
-            <div>
-                <h3>Ваши карты:</h3>
-                <div class="hand" id="playerHand">
-                    <!-- Ваши карты -->
-                </div>
-            </div>
+            <!-- ... ваш существующий игровой интерфейс ... -->
         </div>
     </div>
 
     <script>
-        // Используем localStorage как "сервер" через GitHub Pages
-        const GAME_KEY = 'durak_game_data';
-        const PLAYER_KEY = 'durak_player_data';
-        const POLL_INTERVAL = 2000; // 2 секунды
-
-        let gameState = {
-            gameId: null,
-            playerId: null,
-            playerName: '',
-            gameData: null,
-            selectedCard: null,
-            selectedAttackCard: null
-        };
-
-        // Создание колоды
+        // === GLOBALS ===
+        let peer = null;
+        let conn = null;
+        let gameData = null;
+        let isHost = false;
+        let players = {};
+        
+        // === P2P CONNECTION ===
+        function createP2PGame() {
+            const name = document.getElementById('playerName').value.trim() || 'Игрок1';
+            gameState.playerName = name;
+            isHost = true;
+            
+            // Создаем Peer с случайным ID
+            peer = new Peer({
+                debug: 2,
+                config: { 'iceServers': [
+                    { url: 'stun:stun.l.google.com:19302' },
+                    { url: 'stun:stun1.l.google.com:19302' }
+                ]}
+            });
+            
+            peer.on('open', (id) => {
+                console.log('Мой ID:', id);
+                document.getElementById('myPeerId').textContent = id;
+                document.getElementById('yourCode').style.display = 'block';
+                document.getElementById('waitingMsg').style.display = 'block';
+                updateConnectionStatus('connecting', 'Ожидаем подключения...');
+                
+                gameState.gameId = id;
+                gameState.playerId = id;
+                
+                // Инициализируем игровые данные
+                initGameData();
+            });
+            
+            peer.on('connection', (connection) => {
+                conn = connection;
+                setupConnection();
+            });
+            
+            peer.on('error', (err) => {
+                console.error('Peer error:', err);
+                updateConnectionStatus('disconnected', 'Ошибка: ' + err.type);
+            });
+        }
+        
+        function joinP2PGame() {
+            const name = document.getElementById('playerName').value.trim() || 'Игрок2';
+            const gameCode = document.getElementById('gameCodeInput').value.trim();
+            
+            if (!gameCode) {
+                alert('Введите код игры!');
+                return;
+            }
+            
+            gameState.playerName = name;
+            gameState.gameId = gameCode;
+            isHost = false;
+            
+            // Создаем Peer без ID (он сгенерируется автоматически)
+            peer = new Peer({
+                debug: 2,
+                config: { 'iceServers': [
+                    { url: 'stun:stun.l.google.com:19302' },
+                    { url: 'stun:stun1.l.google.com:19302' }
+                ]}
+            });
+            
+            peer.on('open', (id) => {
+                console.log('Мой ID:', id);
+                gameState.playerId = id;
+                
+                // Подключаемся к хосту
+                conn = peer.connect(gameCode, {
+                    reliable: true
+                });
+                
+                setupConnection();
+                updateConnectionStatus('connecting', 'Подключаемся...');
+            });
+        }
+        
+        function setupConnection() {
+            conn.on('open', () => {
+                console.log('Соединение установлено!');
+                updateConnectionStatus('connected', 'Подключено!');
+                
+                // Отправляем информацию о себе
+                conn.send({
+                    type: 'player_join',
+                    playerId: gameState.playerId,
+                    name: gameState.playerName
+                });
+                
+                // Переходим в игровой экран
+                document.getElementById('connectionScreen').classList.add('hidden');
+                document.getElementById('gameScreen').classList.remove('hidden');
+            });
+            
+            conn.on('data', (data) => {
+                handleMessage(data);
+            });
+            
+            conn.on('close', () => {
+                updateConnectionStatus('disconnected', 'Соединение разорвано');
+                alert('Соединение потеряно!');
+            });
+            
+            conn.on('error', (err) => {
+                console.error('Connection error:', err);
+            });
+        }
+        
+        // === GAME LOGIC ===
+        function initGameData() {
+            gameData = {
+                players: {},
+                deck: createDeck(),
+                trumpCard: null,
+                table: [],
+                currentTurn: null,
+                status: 'waiting'
+            };
+            
+            // Определяем козырь
+            gameData.trumpCard = gameData.deck[0];
+            
+            if (isHost) {
+                // Хост создает свою запись
+                gameData.players[gameState.playerId] = {
+                    id: gameState.playerId,
+                    name: gameState.playerName,
+                    hand: [],
+                    isHost: true
+                };
+                
+                // Хост начинает игру когда подключится второй игрок
+                gameData.status = 'waiting_for_player';
+            }
+        }
+        
         function createDeck() {
             const suits = ['♠', '♥', '♦', '♣'];
             const ranks = ['6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
             const deck = [];
-
+            
             for (let suit of suits) {
                 for (let rank of ranks) {
                     deck.push({
@@ -127,251 +229,151 @@
                     });
                 }
             }
-
+            
             // Перемешиваем
             for (let i = deck.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [deck[i], deck[j]] = [deck[j], deck[i]];
             }
-
+            
             return deck;
         }
-
-        // Создание игры
-        function createGame() {
-            const name = document.getElementById('playerName').value.trim() || 'Игрок1';
-            const gameId = 'GAME_' + Math.random().toString(36).substr(2, 9).toUpperCase();
-
-            gameState.playerId = 'PLAYER_' + Date.now();
-            gameState.playerName = name;
-            gameState.gameId = gameId;
-
-            // Сохраняем данные игрока в localStorage
-            localStorage.setItem(PLAYER_KEY, JSON.stringify({
-                playerId: gameState.playerId,
-                playerName: name,
-                gameId: gameId
-            }));
-
-            // Создаем новую игру
-            const gameData = {
-                gameId: gameId,
-                status: 'waiting',
-                players: [
-                    {
-                        id: gameState.playerId,
-                        name: name,
-                        hand: [],
-                        cards: 0
+        
+        function handleMessage(data) {
+            console.log('Получено сообщение:', data);
+            
+            switch(data.type) {
+                case 'player_join':
+                    if (isHost) {
+                        // Добавляем игрока
+                        gameData.players[data.playerId] = {
+                            id: data.playerId,
+                            name: data.name,
+                            hand: [],
+                            isHost: false
+                        };
+                        
+                        // Если оба игрока на месте, начинаем игру
+                        if (Object.keys(gameData.players).length === 2) {
+                            startGame();
+                        }
                     }
-                ],
-                deck: createDeck(),
-                trumpCard: null,
-                trumpSuit: null,
-                table: [],
-                currentPlayer: null,
-                turn: 'attack',
-                attacker: null,
-                defender: null
-            };
-
-            // Определяем козырь
-            gameData.trumpCard = gameData.deck[0];
-            gameData.trumpSuit = gameData.trumpCard.suit;
-
-            // Сохраняем игру
-            saveGame(gameData);
-
-            // Показываем код игры
-            document.getElementById('gameCode').textContent = gameId;
-            document.getElementById('gameCodeDisplay').classList.remove('hidden');
-            document.getElementById('joinCode').classList.add('hidden');
-
-            // Начинаем опрос
-            startPolling();
-
-            // Переходим в игровой экран
-            document.getElementById('loginScreen').classList.add('hidden');
-            document.getElementById('gameScreen').classList.remove('hidden');
-
-            document.getElementById('gameMessage').innerHTML =
-                `<p>Код игры: <strong>${gameId}</strong></p>
-                 <p>Дайте этот код второму игроку</p>
-                 <p>Ожидание подключения...</p>`;
+                    break;
+                    
+                case 'game_state':
+                    // Обновляем состояние игры
+                    gameData = data.state;
+                    updateUI();
+                    break;
+                    
+                case 'player_action':
+                    // Обрабатываем действия игрока
+                    handlePlayerAction(data);
+                    break;
+            }
         }
-
-        // Присоединение к игре
-        function joinGame() {
-            const name = document.getElementById('playerName').value.trim() || 'Игрок2';
-            const gameId = document.getElementById('joinCode').value.trim().toUpperCase();
-
-            if (!gameId) {
-                alert('Введите код игры!');
-                return;
-            }
-
-            // Пробуем загрузить игру
-            const gameData = loadGame(gameId);
-
-            if (!gameData) {
-                alert('Игра не найдена! Проверьте код.');
-                return;
-            }
-
-            if (gameData.players.length >= 2) {
-                alert('В игре уже два игрока!');
-                return;
-            }
-
-            gameState.playerId = 'PLAYER_' + Date.now();
-            gameState.playerName = name;
-            gameState.gameId = gameId;
-
-            // Сохраняем данные игрока
-            localStorage.setItem(PLAYER_KEY, JSON.stringify({
-                playerId: gameState.playerId,
-                playerName: name,
-                gameId: gameId
-            }));
-
-            // Добавляем игрока в игру
-            gameData.players.push({
-                id: gameState.playerId,
-                name: name,
-                hand: [],
-                cards: 0
-            });
-
-            // Если два игрока, начинаем игру
-            if (gameData.players.length === 2) {
-                startGame(gameData);
-            }
-
-            saveGame(gameData);
-
-            // Начинаем опрос
-            startPolling();
-
-            // Переходим в игровой экран
-            document.getElementById('loginScreen').classList.add('hidden');
-            document.getElementById('gameScreen').classList.remove('hidden');
-
-            document.getElementById('gameMessage').innerHTML =
-                `<p>Вы присоединились к игре!</p>
-                 <p>Ожидание начала игры...</p>`;
-        }
-
-        // Начало игры
-        function startGame(gameData) {
-            gameData.status = 'playing';
-
+        
+        function startGame() {
             // Раздаем карты
-            for (let player of gameData.players) {
-                player.hand = gameData.deck.splice(0, 6);
-                player.cards = player.hand.length;
+            const playerIds = Object.keys(gameData.players);
+            
+            playerIds.forEach(playerId => {
+                gameData.players[playerId].hand = gameData.deck.splice(0, 6);
+            });
+            
+            // Определяем кто ходит первым (рандом)
+            gameData.currentTurn = playerIds[Math.floor(Math.random() * playerIds.length)];
+            gameData.status = 'playing';
+            
+            // Отправляем обновленное состояние всем
+            broadcastGameState();
+        }
+        
+        function broadcastGameState() {
+            if (!isHost) return;
+            
+            if (conn && conn.open) {
+                conn.send({
+                    type: 'game_state',
+                    state: gameData
+                });
             }
-
-            // Определяем кто ходит первым
-            gameData.currentPlayer = gameData.players[0].id;
-            gameData.attacker = gameData.players[0].id;
-            gameData.defender = gameData.players[1].id;
-
-            saveGame(gameData);
         }
-
-        // Сохранение игры
-        function saveGame(gameData) {
-            // Сохраняем в localStorage
-            localStorage.setItem(GAME_KEY + '_' + gameData.gameId, JSON.stringify(gameData));
-
-            // Также сохраняем timestamp последнего обновления
-            localStorage.setItem(GAME_KEY + '_' + gameData.gameId + '_time', Date.now().toString());
+        
+        function sendAction(action, data) {
+            if (conn && conn.open) {
+                conn.send({
+                    type: 'player_action',
+                    playerId: gameState.playerId,
+                    action: action,
+                    data: data
+                });
+            }
         }
-
-        // Загрузка игры
-        function loadGame(gameId) {
-            const data = localStorage.getItem(GAME_KEY + '_' + gameId);
-            return data ? JSON.parse(data) : null;
+        
+        // === UI FUNCTIONS ===
+        function updateConnectionStatus(status, message) {
+            const el = document.getElementById('connectionStatus');
+            el.className = `connection-status ${status}`;
+            el.textContent = message;
+            
+            if (status === 'connected') {
+                document.getElementById('joinBtn').disabled = true;
+            }
         }
-
-        // Опрос обновлений игры
-        function startPolling() {
-            pollGameState();
-            setInterval(pollGameState, POLL_INTERVAL);
-        }
-
-        // Проверка состояния игры
-        function pollGameState() {
-            if (!gameState.gameId) return;
-
-            const gameData = loadGame(gameState.gameId);
+        
+        function updateUI() {
             if (!gameData) return;
-
-            gameState.gameData = gameData;
-            updateGameUI(gameData);
-        }
-
-        // Обновление интерфейса
-        function updateGameUI(gameData) {
+            
             // Обновляем информацию об игроках
-            const player1 = gameData.players[0];
-            const player2 = gameData.players[1];
-
-            document.getElementById('player1').innerHTML = `
-                <h3>${player1.name}</h3>
-                <p>Карт: <span id="p1Cards">${player1.cards}</span></p>
-            `;
-
-            if (player2) {
-                document.getElementById('player2').innerHTML = `
-                    <h3>${player2.name}</h3>
-                    <p>Карт: <span id="p2Cards">${player2.cards}</span></p>
+            const playerList = Object.values(gameData.players);
+            
+            if (playerList.length > 0) {
+                document.getElementById('player1').innerHTML = `
+                    <h3>${playerList[0].name}</h3>
+                    <p>Карт: ${playerList[0].hand ? playerList[0].hand.length : 0}</p>
                 `;
             }
-
+            
+            if (playerList.length > 1) {
+                document.getElementById('player2').innerHTML = `
+                    <h3>${playerList[1].name}</h3>
+                    <p>Карт: ${playerList[1].hand ? playerList[1].hand.length : 0}</p>
+                `;
+            }
+            
+            // Показываем чей ход
+            if (gameData.currentTurn === gameState.playerId) {
+                document.getElementById('gameMessage').textContent = 'Ваш ход!';
+            } else {
+                const currentPlayer = gameData.players[gameData.currentTurn];
+                document.getElementById('gameMessage').textContent = 
+                    `Ходит: ${currentPlayer ? currentPlayer.name : 'оппонент'}`;
+            }
+            
             // Обновляем козырь
             if (gameData.trumpCard) {
-                document.getElementById('trumpCard').innerHTML =
+                document.getElementById('trumpCard').innerHTML = 
                     `Козырь: ${gameData.trumpCard.rank}${gameData.trumpCard.suit}`;
             }
-
+            
             // Обновляем колоду
             document.getElementById('deckCount').textContent = gameData.deck.length;
-
+            
+            // Обновляем руку текущего игрока
+            const myPlayer = gameData.players[gameState.playerId];
+            if (myPlayer && myPlayer.hand) {
+                updateHand(myPlayer.hand);
+            }
+            
             // Обновляем стол
             updateTable(gameData.table);
-
-            // Обновляем руку текущего игрока
-            const currentPlayer = gameData.players.find(p => p.id === gameState.playerId);
-            if (currentPlayer) {
-                updateHand(currentPlayer.hand);
-            }
-
-            // Обновляем сообщение и кнопки
-            updateGameStatus(gameData);
         }
-
-        // Обновление стола
-        function updateTable(tableCards) {
-            const tableEl = document.getElementById('table');
-            tableEl.innerHTML = '';
-
-            tableCards.forEach(card => {
-                const cardEl = document.createElement('div');
-                cardEl.className = `card ${card.color === 'red' ? 'red' : ''}`;
-                cardEl.innerHTML = `
-                    <div>${card.rank}</div>
-                    <div>${card.suit}</div>
-                `;
-                tableEl.appendChild(cardEl);
-            });
-        }
-
-        // Обновление руки
+        
         function updateHand(cards) {
             const handEl = document.getElementById('playerHand');
             handEl.innerHTML = '';
-
+            
             cards.forEach(card => {
                 const cardEl = document.createElement('div');
                 cardEl.className = `card ${card.color === 'red' ? 'red' : ''}`;
@@ -383,189 +385,84 @@
                 handEl.appendChild(cardEl);
             });
         }
-
-        // Выбор карты
+        
+        function updateTable(cards) {
+            const tableEl = document.getElementById('table');
+            tableEl.innerHTML = '';
+            
+            cards.forEach(card => {
+                const cardEl = document.createElement('div');
+                cardEl.className = `card ${card.color === 'red' ? 'red' : ''}`;
+                cardEl.innerHTML = `
+                    <div>${card.rank}</div>
+                    <div>${card.suit}</div>
+                `;
+                tableEl.appendChild(cardEl);
+            });
+        }
+        
         function selectCard(card) {
             gameState.selectedCard = card;
-            updateSelectedCard();
-        }
-
-        function updateSelectedCard() {
-            // Снимаем выделение со всех карт
+            // Подсветка выбранной карты
             document.querySelectorAll('#playerHand .card').forEach(el => {
                 el.classList.remove('selected');
             });
-
-            // Добавляем выделение выбранной карте
-            if (gameState.selectedCard) {
-                const cards = document.querySelectorAll('#playerHand .card');
-                cards.forEach(el => {
-                    if (el.textContent.includes(gameState.selectedCard.rank) &&
-                        el.textContent.includes(gameState.selectedCard.suit)) {
-                        el.classList.add('selected');
-                    }
-                });
-            }
-
-            updateControls();
+            
+            event.target.classList.add('selected');
         }
-
-        // Обновление статуса игры
-        function updateGameStatus(gameData) {
-            const isMyTurn = gameData.currentPlayer === gameState.playerId;
-            const isAttacker = gameData.attacker === gameState.playerId;
-
-            let message = '';
-
-            if (gameData.status === 'waiting') {
-                message = 'Ожидание второго игрока...';
-            } else if (gameData.status === 'playing') {
-                if (isMyTurn) {
-                    message = gameData.turn === 'attack' ?
-                        'Ваш ход! Атакуйте!' : 'Ваш ход! Защищайтесь!';
-                } else {
-                    message = gameData.turn === 'attack' ?
-                        `Ходит ${getPlayerName(gameData.attacker)} (атака)` :
-                        `Ходит ${getPlayerName(gameData.defender)} (защита)`;
-                }
-            }
-
-            document.getElementById('gameMessage').innerHTML = `<p>${message}</p>`;
-            updateControls();
-        }
-
-        // Обновление кнопок управления
-        function updateControls() {
-            if (!gameState.gameData) return;
-
-            const gameData = gameState.gameData;
-            const isMyTurn = gameData.currentPlayer === gameState.playerId;
-            const isAttacker = gameData.attacker === gameState.playerId;
-
-            const attackBtn = document.getElementById('attackBtn');
-            const defendBtn = document.getElementById('defendBtn');
-            const addBtn = document.getElementById('addBtn');
-            const takeBtn = document.getElementById('takeBtn');
-            const passBtn = document.getElementById('passBtn');
-
-            // Включаем/выключаем кнопки в зависимости от ситуации
-            if (isMyTurn && gameData.turn === 'attack') {
-                attackBtn.disabled = !gameState.selectedCard;
-                addBtn.disabled = !gameState.selectedCard || gameData.table.length === 0;
-                passBtn.disabled = gameData.table.length === 0;
-                defendBtn.disabled = true;
-                takeBtn.disabled = true;
-            } else if (isMyTurn && gameData.turn === 'defense') {
-                defendBtn.disabled = !gameState.selectedCard;
-                takeBtn.disabled = false;
-                attackBtn.disabled = true;
-                addBtn.disabled = true;
-                passBtn.disabled = true;
-            } else {
-                attackBtn.disabled = true;
-                defendBtn.disabled = true;
-                addBtn.disabled = true;
-                takeBtn.disabled = true;
-                passBtn.disabled = true;
-            }
-        }
-
-        // Действия игрока
+        
+        // === GAME ACTIONS ===
         function attack() {
-            if (!gameState.selectedCard || !gameState.gameData) return;
-
-            const gameData = gameState.gameData;
-            const player = gameData.players.find(p => p.id === gameState.playerId);
-
-            // Находим карту в руке игрока
-            const cardIndex = player.hand.findIndex(c => c.id === gameState.selectedCard.id);
-            if (cardIndex === -1) return;
-
-            // Перемещаем карту на стол
-            const card = player.hand.splice(cardIndex, 1)[0];
-            gameData.table.push(card);
-            player.cards = player.hand.length;
-
-            // Меняем ход на защиту
-            gameData.turn = 'defense';
-
-            // Сохраняем игру
-            saveGame(gameData);
-
-            // Сбрасываем выбранную карту
+            if (!gameState.selectedCard) return;
+            
+            if (isHost) {
+                // Хост обрабатывает действие локально
+                handleAttack(gameState.playerId, gameState.selectedCard);
+            } else {
+                // Клиент отправляет действие хосту
+                sendAction('attack', { card: gameState.selectedCard });
+            }
+            
             gameState.selectedCard = null;
         }
-
-        function defend() {
-            // Здесь будет логика защиты
-            alert('Защита - в разработке!');
-        }
-
-        function addCard() {
-            // Здесь будет логика подкидывания карт
-            alert('Подкидывание - в разработке!');
-        }
-
-        function takeCards() {
-            // Здесь будет логика взятия карт
-            alert('Взятие карт - в разработке!');
-        }
-
-        function passTurn() {
-            // Здесь будет логика "бито"
-            alert('Бито - в разработке!');
-        }
-
-        // Вспомогательные функции
-        function getPlayerName(playerId) {
-            if (!gameState.gameData) return 'Игрок';
-            const player = gameState.gameData.players.find(p => p.id === playerId);
-            return player ? player.name : 'Игрок';
-        }
-
-        // Инициализация при загрузке
-        window.onload = function() {
-            // Проверяем, есть ли сохраненная игра
-            const playerData = localStorage.getItem(PLAYER_KEY);
-            if (playerData) {
-                const data = JSON.parse(playerData);
-                gameState.playerId = data.playerId;
-                gameState.playerName = data.playerName;
-                gameState.gameId = data.gameId;
-
-                // Показываем поле для ввода кода
-                document.getElementById('joinCode').classList.remove('hidden');
-
-                // Предлагаем продолжить игру
-                document.getElementById('loginMessage').innerHTML =
-                    `<p>Найдена сохраненная игра. Хотите продолжить?</p>
-                     <button onclick="continueGame()">Продолжить</button>`;
+        
+        function handleAttack(playerId, card) {
+            // Убираем карту из руки игрока
+            const player = gameData.players[playerId];
+            const cardIndex = player.hand.findIndex(c => c.id === card.id);
+            
+            if (cardIndex !== -1) {
+                const playedCard = player.hand.splice(cardIndex, 1)[0];
+                gameData.table.push(playedCard);
+                
+                // Передаем ход
+                const playerIds = Object.keys(gameData.players);
+                const nextPlayer = playerIds.find(id => id !== playerId);
+                gameData.currentTurn = nextPlayer;
+                
+                broadcastGameState();
             }
-        };
-
-        function continueGame() {
-            startPolling();
-            document.getElementById('loginScreen').classList.add('hidden');
-            document.getElementById('gameScreen').classList.remove('hidden');
         }
-
-        // Кнопки на стартовом экране
-        document.getElementById('playerName').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') createGame();
-        });
-
-        // Показать/скрыть поле для кода
-        document.querySelectorAll('button').forEach(btn => {
-            btn.addEventListener('click', function() {
-                if (this.textContent === 'Создать игру') {
-                    document.getElementById('joinCode').classList.add('hidden');
-                    document.getElementById('gameCodeDisplay').classList.remove('hidden');
-                } else if (this.textContent === 'Присоединиться') {
-                    document.getElementById('joinCode').classList.remove('hidden');
-                    document.getElementById('gameCodeDisplay').classList.add('hidden');
-                }
+        
+        // Обработчик действий игрока (на стороне хоста)
+        function handlePlayerAction(data) {
+            if (!isHost) return;
+            
+            switch(data.action) {
+                case 'attack':
+                    handleAttack(data.playerId, data.data.card);
+                    break;
+                // Добавьте другие действия (defend, take, pass)
+            }
+        }
+        
+        // === ИНИЦИАЛИЗАЦИЯ ===
+        window.onload = function() {
+            // Включаем кнопку "Присоединиться" только если введен код
+            document.getElementById('gameCodeInput').addEventListener('input', function() {
+                document.getElementById('joinBtn').disabled = this.value.length === 0;
             });
-        });
+        };
     </script>
 </body>
 </html>
